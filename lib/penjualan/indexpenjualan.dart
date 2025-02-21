@@ -1,27 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:ukk_2025/penjualan/keranjang.dart';
-
+import 'package:ukk_2025/penjualan/detailpenjualan.dart';
 
 class penjualan extends StatefulWidget {
   const penjualan({super.key});
 
   @override
-  State<penjualan> createState() => _penjualanState();
+  State<penjualan> createState() => _PenjualanState();
 }
 
-class _penjualanState extends State<penjualan> {
+class _PenjualanState extends State<penjualan> {
   List<Map<String, dynamic>> penjualan = [];
   bool isLoading = true;
 
-  double taxPercentage = 10.0; // Persentase pajak
+  double taxPercentage = 10.0;
 
-  // Fungsi untuk menghitung pajak dari total harga
   num getTaxAmount(int totalHarga) {
     return totalHarga * taxPercentage / 100;
   }
 
-  // Fungsi untuk menghitung total harga setelah pajak
   num getTotalWithTax(int totalHarga) {
     return totalHarga + getTaxAmount(totalHarga);
   }
@@ -45,18 +43,22 @@ class _penjualanState extends State<penjualan> {
 
   Future<void> deletePenjualan(int id) async {
     try {
-      await Supabase.instance.client
-          .from('penjualan')
-          .delete()
-          .eq('PenjualanID', id);
+      await Supabase.instance.client.from('penjualan').delete().eq('PenjualanID', id);
       fetchPenjualan();
     } catch (e) {
       print('Error deleting penjualan: $e');
     }
   }
 
+  void printReceipt(Map<String, dynamic> item) {
+    print("Struk Penjualan");
+    print("Pelanggan: ${item['pelanggan']['NamaPelanggan']}");
+    print("Total Harga: Rp. ${getTotalWithTax(item['TotalHarga']).toStringAsFixed(2)}");
+    print("Terima kasih telah berbelanja!");
+  }
+
   @override
-  initState() {
+  void initState() {
     super.initState();
     fetchPenjualan();
   }
@@ -64,10 +66,13 @@ class _penjualanState extends State<penjualan> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: Text("Daftar Penjualan"),
+      ),
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Colors.purple, Colors.black],
+            colors: [Color(0xFFF8D3FF), Color(0xFF4B224E)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -75,56 +80,88 @@ class _penjualanState extends State<penjualan> {
         child: isLoading
             ? Center(child: CircularProgressIndicator())
             : ListView.builder(
+                padding: EdgeInsets.all(10),
                 itemCount: penjualan.length,
                 itemBuilder: (context, index) {
                   final item = penjualan[index];
                   final int totalHarga = item['TotalHarga'] ?? 0;
-                  final taxAmount = getTaxAmount(totalHarga); 
                   final totalWithTax = getTotalWithTax(totalHarga);
 
-                  return ListTile(
-                    title: Text(item['pelanggan']['NamaPelanggan'] ?? 'Pelanggan'),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Text('Total Harga: Rp. ${totalHarga}'),  // Menampilkan total harga asli (sebelum pajak)
-                        // // Menambahkan informasi pajak dan total harga setelah pajak (jika ingin)
-                        // Text('Pajak: Rp. ${taxAmount.toStringAsFixed(2)}'), // Menampilkan jumlah pajak
-                        Text('Total dengan Pajak: Rp. ${totalWithTax.toStringAsFixed(2)}'), // Menampilkan total setelah pajak
-                      ],
+                  return Card(
+                    elevation: 5,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
                     ),
-                    trailing: IconButton(
-                      icon: Icon(
-                        Icons.delete,
-                        color: Colors.red,
+                    margin: EdgeInsets.symmetric(vertical: 10, horizontal: 5),
+                    child: Padding(
+                      padding: EdgeInsets.all(10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item['pelanggan']['NamaPelanggan'] ?? 'Pelanggan',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                          SizedBox(height: 5),
+                          Text('Total: Rp. ${totalWithTax.toStringAsFixed(2)}',
+                              style: TextStyle(fontSize: 16, color: Colors.black54)),
+                          SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              ElevatedButton(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => DetailPenjualanPage(
+                                        penjualanId: item['PenjualanID'],
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: Text('Detail'),
+                              ),
+                              // IconButton(
+                              //   icon: Icon(Icons.print, color: Colors.blue),
+                              //   onPressed: () {
+                              //     printReceipt(item);
+                              //   },
+                              // ),
+                              // IconButton(
+                              //   icon: Icon(Icons.delete, color: Colors.red),
+                              //   onPressed: () {
+                              //     showDialog(
+                              //       context: context,
+                              //       builder: (BuildContext context) {
+                              //         return AlertDialog(
+                              //           title: const Text('Hapus Penjualan'),
+                              //           content: const Text('Apakah Anda yakin ingin menghapus penjualan ini?'),
+                              //           actions: [
+                              //             TextButton(
+                              //               onPressed: () => Navigator.pop(context),
+                              //               child: const Text('Batal'),
+                              //             ),
+                              //             TextButton(
+                              //               onPressed: () {
+                              //                 deletePenjualan(item['PenjualanID']);
+                              //                 Navigator.pop(context);
+                              //                 setState(() {
+                              //                   penjualan.removeAt(index);
+                              //                 });
+                              //               },
+                              //               child: const Text('Hapus'),
+                              //             ),
+                              //           ],
+                              //         );
+                              //       },
+                              //     );
+                              //   },
+                              // ),
+                            ],
+                          ),
+                        ],
                       ),
-                      onPressed: () {
-                        showDialog(
-                          context: context,
-                          builder: (BuildContext context) {
-                            return AlertDialog(
-                              title: const Text('Hapus Penjualan'),
-                              content: const Text('Apakah Anda yakin ingin menghapus penjualan ini?'),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(context),
-                                  child: const Text('Batal'),
-                                ),
-                                TextButton(
-                                  onPressed: () {
-                                    deletePenjualan(item['PenjualanID']);
-                                    Navigator.pop(context);
-                                    setState(() {
-                                      penjualan.removeAt(index);
-                                    });
-                                  },
-                                  child: const Text('Hapus'),
-                                )
-                              ],
-                            );
-                          },
-                        );
-                      },
                     ),
                   );
                 },
@@ -132,11 +169,11 @@ class _penjualanState extends State<penjualan> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
-          var sales = await Navigator.of(context).push(
-            MaterialPageRoute(builder: (context) => produkdetail()),
+          final newPenjualan = await Navigator.of(context).push(
+            MaterialPageRoute(builder: (context) => AddTransaksi()),
           );
 
-          if (sales == true) {
+          if (newPenjualan != null) {
             fetchPenjualan();
           }
         },

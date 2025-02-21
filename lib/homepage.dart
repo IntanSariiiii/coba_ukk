@@ -42,12 +42,6 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          'Manajemen Data',
-          style: TextStyle(
-            color: Colors.purple,
-          ),
-        ),
         centerTitle: true,
         backgroundColor: Colors.white,
         iconTheme: IconThemeData(
@@ -124,10 +118,6 @@ class _HomePageState extends State<HomePage> {
           BottomNavigationBarItem(
             icon: Icon(Icons.shopping_cart),
             label: 'Penjualan',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.receipt_long),
-            label: 'Detail Penjualan',
           ),
         ],
       ),

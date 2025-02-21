@@ -1,246 +1,231 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
-import 'package:flutter/services.dart';
-import 'package:dropdown_textfield/dropdown_textfield.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:ukk_2025/penjualan/indexpenjualan.dart';
 
-class produkdetail extends StatefulWidget {
-  const produkdetail({super.key});
+class AddTransaksi extends StatefulWidget {
+  const AddTransaksi({super.key});
 
-  @override  
-  State<produkdetail> createState() => produkdetailState();
+  @override
+  State<AddTransaksi> createState() => _AddTransaksiState();
 }
 
-class produkdetailState extends State<produkdetail> {
-  final SingleValueDropDownController nameController =
-      SingleValueDropDownController();
-  final SingleValueDropDownController produkController =
-      SingleValueDropDownController();
-  final TextEditingController quantityController = 
-      TextEditingController();
-  List myproduct = [];
-  List user = [];
-  List<Map<String, dynamic>> cart = [];
+class _AddTransaksiState extends State<AddTransaksi> {
+  final _tgl = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  String? selectedPelanggan;
+  String? selectedProduk;
+  int jumlahProduk = 1;
+  List<Map<String, dynamic>> pelangganList = [];
+  List<Map<String, dynamic>> produkList = [];
+  List<Map<String, dynamic>> selectedProdukList = [];
 
-  // Persentase pajak (misalnya 10%)
-  double taxPercentage = 0.10;
-
-  @override  
+  @override
   void initState() {
     super.initState();
-    takeProduct();
-    takePelanggan();
+    _tgl.text = DateTime.now().toLocal().toString().split(' ')[0]; // Isi otomatis dengan tanggal hari ini
+    fetchData();
   }
 
-  @override  
-  void dispose() {
-    nameController.dispose();
-    produkController.dispose();
-    quantityController.dispose();
-    super.dispose();
+  Future<void> fetchData() async {
+    await fetchPelanggan();
+    await fetchProduk();
   }
 
-  Future<void> takeProduct() async {
-    try {
-      var product = await Supabase.instance.client
-        .from('produk')
-        .select();
-      setState(() {
-        myproduct = product;
-      });
-    } catch (e) {
-      print('Error fetching products: $e');
+  Future<void> fetchPelanggan() async {
+    final response = await Supabase.instance.client.from('pelanggan').select();
+    setState(() {
+      pelangganList = List<Map<String, dynamic>>.from(response);
+      if (pelangganList.isNotEmpty) {
+        selectedPelanggan = pelangganList.first['PelangganID'].toString();
+      }
+    });
+  }
+
+  Future<void> fetchProduk() async {
+    final response = await Supabase.instance.client.from('produk').select();
+    setState(() {
+      produkList = List<Map<String, dynamic>>.from(response);
+    });
+  }
+
+  void addProduk() {
+    if (selectedProduk == null) return;
+
+    final produk = produkList.firstWhere((p) => p['ProdukID'].toString() == selectedProduk);
+
+    // Cek apakah stok cukup
+    if (jumlahProduk > produk['Stok']) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Stok ${produk['NamaProduk']} tidak mencukupi!')),
+      );
+      return;
     }
-  }
 
-  Future<void> takePelanggan() async {
-    try {
-      var pelanggan = await Supabase.instance.client
-        .from('pelanggan')
-        .select();
-      setState(() {
-        user = pelanggan;
+    setState(() {
+      selectedProdukList.add({
+        'ProdukID': produk['ProdukID'],
+        'NamaProduk': produk['NamaProduk'],
+        'JumlahProduk': jumlahProduk,
+        'Harga': produk['Harga'],
+        'Subtotal': produk['Harga'] * jumlahProduk,
       });
-    } catch (e) {
-      print('Error fetching customers: $e');
-    }
+    });
   }
 
-  void tambahproduk() {
-    final selectedProduct = produkController.dropDownValue?.value;
-    final int quantity = int.tryParse(quantityController.text) ?? 0;
+  Future<void> transaksi() async {
+    if (_formKey.currentState!.validate() && selectedProdukList.isNotEmpty) {
+      final String tanggalPenjualan = _tgl.text.trim();
+      final int pelangganID = int.parse(selectedPelanggan!);
+      final double totalHarga = selectedProdukList.fold(0, (sum, item) => sum + item['Subtotal']);
 
-    if (selectedProduct != null && quantity > 0) {
-      setState(() {
-        cart.add({
-          "ProdukID": selectedProduct["ProdukID"],
-          "NamaProduk": selectedProduct["NamaProduk"],
-          "Harga": selectedProduct["Harga"],
-          "jumlah": quantity,
-          "Subtotal": (selectedProduct["Harga"] * quantity)
-        });
-      });
-    }
-  }
+      try {
+        final response = await Supabase.instance.client.from('penjualan').insert({
+          'TanggalPenjualan': tanggalPenjualan,
+          'TotalHarga': totalHarga,
+          'PelangganID': pelangganID,
+        }).select();
 
-  void showtambahprodukdialog() {
-    showDialog(
-      context: context, 
-      builder: (context) {
-        return AlertDialog(
-          title: Text('Tambah Produk'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropDownTextField(
-                dropDownList: myproduct
-                .map((p) => DropDownValueModel(name: p['NamaProduk'], value: p))
-                .toList(),
-              controller: produkController,
-              textFieldDecoration: InputDecoration(labelText: "Pilih Produk"),
-              ),
-              TextField(
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                controller: quantityController,
-                decoration: InputDecoration(labelText: 'Jumlah'),
-                keyboardType: TextInputType.number,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('Kembali'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                tambahproduk();
-                Navigator.pop(context);
-              },
-              child: Text('Tambah'),
-            ),
-          ],
-        );
-      },
-    );
-  }
+        if (response.isNotEmpty) {
+          final int penjualanID = response.first['PenjualanID'];
 
-  Future<void> executiveSalses() async {
-    if (cart.isEmpty || nameController.dropDownValue == null) return;
+          for (var produk in selectedProdukList) {
+            await Supabase.instance.client.from('detailpenjualan').insert({
+              'PenjualanID': penjualanID,
+              'ProdukID': produk['ProdukID'],
+              'JumlahProduk': produk['JumlahProduk'],
+              'Subtotal': produk['Subtotal'],
+            });
 
-    var pelangganID = nameController.dropDownValue!.value["PelangganID"];
-    num totalHarga = cart.fold(0, (sum, item) => sum + item["Subtotal"]);
-
-    try {
-      var penjualan = await Supabase.instance.client
-        .from('penjualan')
-        .insert([{"PelangganID": pelangganID, "TotalHarga": totalHarga}])
-        .select()
-        .single();
-
-      if (penjualan.isNotEmpty) {
-        for (var item in cart) {
-          var response = await Supabase.instance.client
-          .from('detailpenjualan')
-          .insert([{
-            "PenjualanID": penjualan["PenjualanID"],
-            "ProdukID": item["ProdukID"],
-            "JumlahProduk": item["jumlah"],
-            "Subtotal": item["Subtotal"]
-          }]);
-
-          await Supabase.instance.client
-          .from('produk')
-          .update({
-            'Stok': item["Stok"] - item["jumlah"]
-          })
-          .eq('ProdukID', item["ProdukID"]);
+            // Update stok produk
+            await Supabase.instance.client.from('produk').update({
+              'Stok': produkList.firstWhere((p) => p['ProdukID'] == produk['ProdukID'])['Stok'] - produk['JumlahProduk'],
+            }).match({'ProdukID': produk['ProdukID']});
+          }
         }
 
-        setState(() {
-          cart.clear();
-        });
-
-        Navigator.pop(context, true);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Transaksi berhasil!')));
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => penjualan()));
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
-    } catch (e) {
-      print('Error executing sales: $e');
     }
-  }
-  num getTotalHarga() {
-    return cart.fold(0, (sum, item) => sum + item["Subtotal"]);
-  }
-
-  num getTaxAmount() {
-    return getTotalHarga() * taxPercentage;
-  }
-  num getTotalWithTax() {
-    return getTotalHarga() + getTaxAmount();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-       appBar: AppBar(title: Text("Detail Produk")),
+      appBar: AppBar(title: const Text('Tambah Penjualan')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            DropDownTextField(
-              dropDownList: user
-                .map((p) => DropDownValueModel(name: p['NamaPelanggan'], value: p))
-                .toList(),
-              controller: nameController,
-              textFieldDecoration: InputDecoration(labelText: "Pilih Pelanggan"),
-            ),
-            SizedBox(height: 10),
- 
-            ElevatedButton(
-              onPressed: showtambahprodukdialog,
-              child: Text("Tambah Produk"),
-            ),
-            SizedBox(height: 10),
-   
-            Expanded(
-              child: ListView.builder(
-                itemCount: cart.length,
-                itemBuilder: (context, index) {
-                  final item = cart[index];
-                  return ListTile(
-                    title: Text(item["NamaProduk"]),
-                    subtitle: Text("Jumlah: ${item["jumlah"]} - Rp${item["Subtotal"]}"),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Input Tanggal
+              TextFormField(
+                controller: _tgl,
+                readOnly: true,
+                decoration: InputDecoration(
+                  labelText: 'Tanggal Penjualan',
+                  border: OutlineInputBorder(),
+                  suffixIcon: Icon(Icons.calendar_today, color: Colors.blueAccent),
+                ),
+                validator: (value) => value == null || value.isEmpty ? 'Tanggal tidak boleh kosong' : null,
+                onTap: () async {
+                  DateTime? pickedDate = await showDatePicker(
+                    context: context,
+                    initialDate: DateTime.now(),
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime(2101),
                   );
+                  if (pickedDate != null) {
+                    setState(() {
+                      _tgl.text = pickedDate.toLocal().toString().split(' ')[0];
+                    });
+                  }
                 },
               ),
-            ),
-            ElevatedButton(
-              onPressed: executiveSalses,
-              child: Text('Transaksi'),
-            ),
-            Align(
-              alignment: Alignment.bottomLeft,
-              child: Padding(
-                padding: const EdgeInsets.only(top: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Total: Rp${getTotalHarga()}',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      'Pajak (10%): Rp${getTaxAmount()}',
-                      style: TextStyle(fontSize: 16),
-                    ),
-                    Text(
-                      'Total + Pajak: Rp${getTotalWithTax()}',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                  ],
+              const SizedBox(height: 16),
+
+              // Dropdown Pilih Pelanggan
+              DropdownButtonFormField<String>(
+                value: selectedPelanggan,
+                decoration: InputDecoration(
+                  labelText: 'Pilih Pelanggan',
+                  border: OutlineInputBorder(),
+                ),
+                items: pelangganList.map((pelanggan) {
+                  return DropdownMenuItem(
+                    value: pelanggan['PelangganID'].toString(),
+                    child: Text(pelanggan['NamaPelanggan'] ?? 'Tanpa Nama'),
+                  );
+                }).toList(),
+                onChanged: (value) => setState(() => selectedPelanggan = value),
+                validator: (value) => value == null ? 'Pilih pelanggan' : null,
+              ),
+              const SizedBox(height: 16),
+
+              // Dropdown Pilih Produk
+              DropdownButtonFormField<String>(
+                value: selectedProduk,
+                decoration: InputDecoration(
+                  labelText: 'Pilih Produk',
+                  border: OutlineInputBorder(),
+                ),
+                items: produkList.map((produk) {
+                  return DropdownMenuItem(
+                    value: produk['ProdukID'].toString(),
+                    child: Text('${produk['NamaProduk']} (Stok: ${produk['Stok']})'),
+                  );
+                }).toList(),
+                onChanged: (value) => setState(() => selectedProduk = value),
+                validator: (value) => value == null ? 'Pilih produk' : null,
+              ),
+              const SizedBox(height: 16),
+
+              // Input Jumlah Produk
+              TextFormField(
+                decoration: InputDecoration(
+                  labelText: 'Jumlah Produk',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+                onChanged: (value) => jumlahProduk = int.tryParse(value) ?? 1,
+              ),
+              const SizedBox(height: 16),
+
+              // Tombol Tambah Produk
+              ElevatedButton(
+                onPressed: addProduk,
+                child: const Text('Tambah Produk ke Daftar'),
+              ),
+
+              // Daftar Produk yang Dipilih
+              Expanded(
+                child: ListView.builder(
+                  itemCount: selectedProdukList.length,
+                  itemBuilder: (context, index) {
+                    final produk = selectedProdukList[index];
+                    return ListTile(
+                      title: Text('${produk['NamaProduk']} (x${produk['JumlahProduk']})'),
+                      subtitle: Text('Subtotal: Rp. ${produk['Subtotal'].toStringAsFixed(2)}'),
+                      trailing: IconButton(
+                        icon: Icon(Icons.delete, color: Colors.red),
+                        onPressed: () => setState(() => selectedProdukList.removeAt(index)),
+                      ),
+                    );
+                  },
                 ),
               ),
-            ),
-          ],
+
+              // Tombol Tambah Transaksi
+              ElevatedButton(
+                onPressed: transaksi,
+                child: const Text('Tambah Transaksi'),
+              ),
+            ],
+          ),
         ),
       ),
     );

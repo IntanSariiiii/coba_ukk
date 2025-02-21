@@ -22,7 +22,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: const LoginPage(),
+      home: LoginPage(),
     );
   }
 }
@@ -92,10 +92,10 @@ class _LoginPageState extends State<LoginPage> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.admin_panel_settings, size: 185, color: Colors.white),
+                      Icon(Icons.book, size: 185, color: Colors.white),
                       SizedBox(height: 20),
                       Text(
-                        'SIGN IN',
+                        'Intan Stationery',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 24,

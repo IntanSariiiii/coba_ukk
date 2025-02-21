@@ -75,7 +75,7 @@ class _produkState extends State<produk> {
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Colors.purple, Colors.black],
+            colors: [const Color.fromARGB(255, 242, 197, 250), Colors.black],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
