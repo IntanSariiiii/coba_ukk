@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:ukk_2025/penjualan/indexpenjualan.dart';
-
+//penjualaan
 class AddTransaksi extends StatefulWidget {
   const AddTransaksi({super.key});
 
